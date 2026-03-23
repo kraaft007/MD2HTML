@@ -800,6 +800,22 @@ function paginateContent() {
     el.setAttribute('data-pagination-push', pushAmount);
   }
 
+  // Helper: find the nearest preceding heading that should travel with
+  // a pushed block. Walks backwards through previous siblings, skipping
+  // short paragraphs (e.g. "Each topic file uses frontmatter:").
+  // Returns the heading element, or null if none qualifies.
+  function findCompanionHeading(el) {
+    let prev = el.previousElementSibling;
+    // Skip at most one short paragraph between heading and block
+    if (prev && prev.tagName === 'P' && prev.getBoundingClientRect().height < 40) {
+      prev = prev.previousElementSibling;
+    }
+    if (prev && /^H[1-6]$/.test(prev.tagName) && !prev.getAttribute('data-pagination-push')) {
+      return prev;
+    }
+    return null;
+  }
+
   // Helper: check if element straddles a page boundary
   function straddlesBoundary(p) {
     return p.elTop < p.pageBottomY && p.elBottom > p.pageBottomY;
@@ -863,7 +879,16 @@ function paginateContent() {
         if (isSplit && fitsOnOnePage) {
           const spillRatio = (p.elBottom - p.pageBottomY) / p.elHeight;
           if (spillRatio > 0.3) {
-            pushElement(el, p.pageBottomY - p.elTop + TOP_BREATHING_ROOM);
+            const pushAmt = p.pageBottomY - p.elTop + TOP_BREATHING_ROOM;
+            // RULE 3a: If a heading sits right above this block, take it along
+            const heading = findCompanionHeading(el);
+            if (heading) {
+              const hPos = getPos(heading);
+              const hPush = p.pageBottomY - hPos.elTop + TOP_BREATHING_ROOM;
+              pushElement(heading, hPush);
+            } else {
+              pushElement(el, pushAmt);
+            }
             madeChanges = true;
             continue;
           }
@@ -872,21 +897,29 @@ function paginateContent() {
         // Large code block spanning multiple pages — nudge so page breaks
         // fall between lines rather than through them
         if (isSplit && !fitsOnOnePage && tag === 'PRE') {
+          // RULE 3b: If a heading sits right above, take it along
+          const heading = findCompanionHeading(el);
+          if (heading) {
+            const hPos = getPos(heading);
+            // Only pull the heading if it's on the same page as the block start
+            if (hPos.pageIndex === p.pageIndex) {
+              const hPush = p.pageBottomY - hPos.elTop + TOP_BREATHING_ROOM;
+              pushElement(heading, hPush);
+              madeChanges = true;
+              continue;
+            }
+          }
+
           const codeEl = el.querySelector('code') || el;
           const style = window.getComputedStyle(codeEl);
           const lineH = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4;
           if (lineH > 0) {
-            // How far into the code block does the page break fall?
             const breakInBlock = p.pageBottomY - p.elTop;
-            // Padding-top of the pre element
             const prePadTop = parseFloat(window.getComputedStyle(el).paddingTop) || 0;
             const contentStart = breakInBlock - prePadTop;
-            // Which line does the break fall on?
             const linePos = contentStart % lineH;
-            // If the break is in the middle of a line (not near top/bottom),
-            // nudge the block down so the break falls between lines
             if (linePos > lineH * 0.15 && linePos < lineH * 0.85) {
-              const nudge = lineH - linePos + 2; // +2px breathing room
+              const nudge = lineH - linePos + 2;
               el.style.marginTop = (parseFloat(el.style.marginTop || 0) + nudge) + 'px';
               el.classList.add('pagination-spacer');
               el.setAttribute('data-pagination-push', nudge);

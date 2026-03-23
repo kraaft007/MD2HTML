@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Claude Code session data
+.claude/
+audit.jsonl
+
+# Sample outputs (regenerable)
+outputs/Guide-Lessons1-*.print.html
+outputs/Guide-Lessons1.md

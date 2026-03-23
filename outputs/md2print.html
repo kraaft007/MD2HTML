@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MD2Print — Markdown Print Formatter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+<style>
+/* ============================================================
+   APP SHELL (screen only)
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  --panel-width: 320px;
+  --bg: #f5f5f5;
+  --panel-bg: #ffffff;
+  --accent: #4a6cf7;
+}
+body {
+  margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: #222; display: flex; height: 100vh; overflow: hidden;
+}
+
+/* --- SETTINGS PANEL --- */
+#panel {
+  width: var(--panel-width); min-width: var(--panel-width); background: var(--panel-bg);
+  border-right: 1px solid #ddd; overflow-y: auto; padding: 16px; font-size: 13px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+#panel h2 { font-size: 18px; margin: 0 0 4px 0; color: var(--accent); }
+#panel h3 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: #888;
+  margin: 12px 0 4px 0; padding-top: 8px; border-top: 1px solid #eee;
+}
+#panel label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#panel select, #panel input[type="number"], #panel input[type="text"] {
+  flex: 1; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;
+}
+#panel input[type="color"] { width: 32px; height: 24px; border: 1px solid #ccc; border-radius: 4px; padding: 0; cursor: pointer; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > label { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 600; transition: background .15s;
+}
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #3a5ce6; }
+.btn-secondary { background: #eee; color: #333; }
+.btn-secondary:hover { background: #ddd; }
+.btn-danger { background: #fee; color: #c53030; border: 1px solid #fcc; }
+.btn-danger:hover { background: #fdd; }
+#btnPrint { width: 100%; margin-top: 8px; font-size: 15px; padding: 10px; }
+#btnLoad { width: 100%; }
+
+/* --- PREVIEW AREA --- */
+#preview-wrap {
+  flex: 1; overflow-y: auto; padding: 24px; display: flex; justify-content: center;
+  background: #e0e0e0; position: relative;
+}
+#preview-container {
+  width: 8.5in; background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,.15);
+  padding: 0.5in; position: relative;
+}
+
+/* --- PAGE BREAK LINES (screen only) --- */
+.page-break-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 0;
+  border-top: 2px dashed #f87171;
+  z-index: 10;
+  pointer-events: none;
+}
+.page-break-label {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-100%);
+  font-size: 9px;
+  color: #f87171;
+  background: #fff;
+  padding: 0 4px;
+  font-family: -apple-system, sans-serif;
+  pointer-events: none;
+}
+/* Visual indicator for pagination-adjusted elements (screen only) */
+.pagination-spacer::before {
+  content: '↓ pushed to new page';
+  display: block;
+  font-size: 9px;
+  color: #f59e0b;
+  font-family: -apple-system, sans-serif;
+  font-weight: 400;
+  margin-bottom: 2px;
+  letter-spacing: 0.3px;
+}
+
+/* --- DROP ZONE --- */
+#dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 3px dashed #bbb; border-radius: 12px; padding: 48px; color: #888;
+  font-size: 16px; text-align: center; cursor: pointer; min-height: 300px;
+  transition: border-color .2s, background .2s;
+}
+#dropzone.dragover { border-color: var(--accent); background: #f0f4ff; }
+#dropzone p { margin: 8px 0; }
+#dropzone .hint { font-size: 12px; color: #aaa; }
+
+/* --- DOCUMENT STYLES (screen preview) --- */
+#doc-content h1 { page-break-after: avoid; }
+#doc-content h2 { page-break-after: avoid; }
+#doc-content h3 { page-break-after: avoid; }
+#doc-content pre {
+  background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 4px;
+  padding: 12px 14px; overflow-x: auto; font-size: 12px; line-height: 1.45;
+  white-space: pre; word-wrap: normal;
+}
+#doc-content code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+#doc-content pre code { background: none; padding: 0; font-size: inherit; }
+#doc-content code:not(pre code) {
+  background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 0.9em;
+}
+#doc-content table {
+  border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.9em;
+}
+#doc-content th, #doc-content td {
+  border: 1px solid #d0d7de; padding: 6px 10px; text-align: left;
+}
+#doc-content th { background: #f6f8fa; font-weight: 600; }
+#doc-content hr { border: none; border-top: 2px solid #ddd; margin: 20px 0; }
+#doc-content blockquote {
+  border-left: 4px solid #ddd; margin: 12px 0; padding: 4px 16px; color: #555;
+}
+#doc-content ul, #doc-content ol { padding-left: 24px; }
+#doc-content li { margin-bottom: 4px; }
+#doc-content img { max-width: 100%; }
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+  body { background: #fff; display: block; }
+  #panel { display: none !important; }
+  #preview-wrap {
+    padding: 0; overflow: visible; display: block; background: #fff;
+  }
+  #preview-container {
+    width: 100%; box-shadow: none; padding: 0; min-height: auto;
+  }
+  #dropzone { display: none !important; }
+  .page-break-line { display: none !important; }
+
+  @page { size: letter; }
+
+  .print-header, .print-footer {
+    display: block !important;
+    position: fixed;
+    left: 0; right: 0;
+    font-size: 9px;
+    color: #666;
+    padding: 0 0.3in;
+  }
+  .print-header {
+    top: 0;
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    height: 0.4in;
+    border-bottom: 1px solid #ddd;
+  }
+  .print-footer {
+    bottom: 0;
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    height: 0.35in;
+    border-top: 1px solid #ddd;
+  }
+  .print-header img { height: 18px; }
+
+  #doc-content pre { page-break-inside: avoid; }
+  #doc-content table { page-break-inside: avoid; }
+  #doc-content tr { page-break-inside: avoid; }
+  #doc-content h1, #doc-content h2, #doc-content h3 { page-break-after: avoid; }
+  /* Elements pushed by pagination engine get a forced page break */
+  #doc-content .pagination-break-before { page-break-before: always; margin-top: 0 !important; }
+  .page-break-line { display: none !important; }
+  .pagination-spacer::before { display: none !important; }
+}
+.print-header, .print-footer { display: none; }
+
+/* Preset theme selector chips */
+.theme-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.theme-chip {
+  padding: 3px 8px; border-radius: 12px; font-size: 11px; cursor: pointer;
+  border: 1px solid #ddd; background: #f8f8f8; transition: all .15s;
+  position: relative;
+}
+.theme-chip:hover { border-color: var(--accent); }
+.theme-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.theme-chip.custom { border-style: dashed; }
+.theme-chip .delete-x {
+  display: none; position: absolute; top: -6px; right: -6px;
+  width: 14px; height: 14px; border-radius: 50%; background: #e53e3e; color: #fff;
+  font-size: 9px; line-height: 14px; text-align: center; cursor: pointer;
+}
+.theme-chip.custom:hover .delete-x { display: block; }
+
+/* Toggle switch */
+.toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.toggle {
+  width: 36px; height: 20px; background: #ccc; border-radius: 10px; position: relative;
+  cursor: pointer; transition: background .2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  transition: transform .2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+</style>
+</head>
+<body>
+
+<!-- ============== SETTINGS PANEL ============== -->
+<div id="panel">
+  <h2>MD2Print</h2>
+  <p style="font-size:11px;color:#888;margin:0 0 4px 0;">Markdown to print-optimized HTML</p>
+
+  <button class="btn btn-secondary" id="btnLoad" onclick="document.getElementById('fileInput').click()">
+    Open .md File
+  </button>
+  <input type="file" id="fileInput" accept=".md,.txt,.markdown" style="display:none">
+  <p style="font-size:10px;color:#999;margin:2px 0 0 0;">
+    Tip: Press <kbd style="background:#eee;padding:1px 4px;border-radius:3px;border:1px solid #ccc;font-size:10px;">Cmd+Shift+.</kbd> in the file dialog to show hidden files (.claude/, etc.)
+  </p>
+
+  <!-- === THEMES === -->
+  <h3>Themes</h3>
+  <div class="theme-chips" id="themeChips"></div>
+  <div class="row" style="margin-top:6px;">
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="saveCurrentAsTheme()">Save as Theme</button>
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportThemes()">Export JSON</button>
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="document.getElementById('importInput').click()">Import JSON</button>
+    <input type="file" id="importInput" accept=".json" style="display:none">
+  </div>
+
+  <!-- === PAGE BREAKS TOGGLE === -->
+  <h3>Preview</h3>
+  <div class="toggle-row">
+    <div class="toggle on" id="pageBreakToggle" onclick="togglePageBreaks()"></div>
+    <span>Show page break lines (US Letter)</span>
+  </div>
+
+  <!-- === PAGE MARGINS === -->
+  <h3>Page Margins (inches)</h3>
+  <div class="row">
+    <label>Top <input type="number" id="marginTop" value="0.5" step="0.1" min="0" max="2"></label>
+    <label>Bottom <input type="number" id="marginBottom" value="0.5" step="0.1" min="0" max="2"></label>
+  </div>
+  <div class="row">
+    <label>Left <input type="number" id="marginLeft" value="0.5" step="0.1" min="0" max="2"></label>
+    <label>Right <input type="number" id="marginRight" value="0.5" step="0.1" min="0" max="2"></label>
+  </div>
+
+  <!-- === BODY TEXT === -->
+  <h3>Body Text</h3>
+  <label>Font
+    <select id="bodyFont">
+      <option value="'Georgia', serif">Georgia (Serif)</option>
+      <option value="'-apple-system', 'Segoe UI', sans-serif" selected>System Sans</option>
+      <option value="'Palatino Linotype', 'Book Antiqua', serif">Palatino</option>
+      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Charter', 'Bitstream Charter', serif">Charter</option>
+    </select>
+  </label>
+  <div class="row">
+    <label>Size <input type="number" id="bodySize" value="11" min="8" max="18" step="0.5"> pt</label>
+    <label>Color <input type="color" id="bodyColor" value="#222222"></label>
+  </div>
+  <label>Line height <input type="number" id="bodyLineHeight" value="1.5" min="1" max="2.5" step="0.1"></label>
+
+  <!-- === HEADINGS === -->
+  <h3>Heading 1 (H1)</h3>
+  <label>Font
+    <select id="h1Font">
+      <option value="'Georgia', serif">Georgia</option>
+      <option value="'-apple-system', 'Segoe UI', sans-serif" selected>System Sans</option>
+      <option value="'Palatino Linotype', 'Book Antiqua', serif">Palatino</option>
+      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Charter', 'Bitstream Charter', serif">Charter</option>
+    </select>
+  </label>
+  <div class="row">
+    <label>Size <input type="number" id="h1Size" value="22" min="14" max="36" step="1"> pt</label>
+    <label>Color <input type="color" id="h1Color" value="#1a1a2e"></label>
+  </div>
+  <label>Spacing below <input type="number" id="h1Margin" value="8" min="0" max="30" step="1"> px</label>
+
+  <h3>Heading 2 (H2)</h3>
+  <label>Font
+    <select id="h2Font">
+      <option value="'Georgia', serif">Georgia</option>
+      <option value="'-apple-system', 'Segoe UI', sans-serif" selected>System Sans</option>
+      <option value="'Palatino Linotype', 'Book Antiqua', serif">Palatino</option>
+      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Charter', 'Bitstream Charter', serif">Charter</option>
+    </select>
+  </label>
+  <div class="row">
+    <label>Size <input type="number" id="h2Size" value="16" min="12" max="28" step="1"> pt</label>
+    <label>Color <input type="color" id="h2Color" value="#2d3748"></label>
+  </div>
+  <label>Spacing below <input type="number" id="h2Margin" value="6" min="0" max="24" step="1"> px</label>
+
+  <h3>Heading 3 (H3)</h3>
+  <label>Font
+    <select id="h3Font">
+      <option value="'Georgia', serif">Georgia</option>
+      <option value="'-apple-system', 'Segoe UI', sans-serif" selected>System Sans</option>
+      <option value="'Palatino Linotype', 'Book Antiqua', serif">Palatino</option>
+      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Charter', 'Bitstream Charter', serif">Charter</option>
+    </select>
+  </label>
+  <div class="row">
+    <label>Size <input type="number" id="h3Size" value="13" min="10" max="22" step="1"> pt</label>
+    <label>Color <input type="color" id="h3Color" value="#4a5568"></label>
+  </div>
+  <label>Spacing below <input type="number" id="h3Margin" value="4" min="0" max="20" step="1"> px</label>
+
+  <!-- === CODE / ASCII === -->
+  <h3>Code Blocks</h3>
+  <div class="row">
+    <label>Font size <input type="number" id="codeSize" value="9" min="6" max="14" step="0.5"> pt</label>
+    <label>BG <input type="color" id="codeBg" value="#f6f8fa"></label>
+  </div>
+
+  <!-- === HEADER / FOOTER === -->
+  <h3>Page Header</h3>
+  <div class="row">
+    <label>Left
+      <select id="headerLeft">
+        <option value="none">None</option>
+        <option value="logo">Logo (PNG)</option>
+      </select>
+    </label>
+    <label>Right
+      <select id="headerRight">
+        <option value="none">None</option>
+        <option value="filename" selected>File Name</option>
+      </select>
+    </label>
+  </div>
+  <label id="logoUploadRow" style="display:none;">
+    Logo file <input type="file" id="logoInput" accept="image/png,image/jpeg,image/svg+xml">
+  </label>
+
+  <h3>Page Footer</h3>
+  <div class="row">
+    <label>Left
+      <select id="footerLeft">
+        <option value="none">None</option>
+        <option value="date" selected>Date (MM-DD-YYYY)</option>
+      </select>
+    </label>
+    <label>Right
+      <select id="footerRight">
+        <option value="none">None</option>
+        <option value="pagenum" selected>Page X of Y</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- === ACTIONS === -->
+  <h3>Actions</h3>
+  <button class="btn btn-primary" id="btnPrint" onclick="window.print()">
+    Print / Save as PDF
+  </button>
+</div>
+
+<!-- ============== PREVIEW ============== -->
+<div id="preview-wrap">
+  <div id="preview-container">
+    <!-- Print header/footer (only visible when printing) -->
+    <div class="print-header" id="printHeader">
+      <span id="phLeft"></span>
+      <span id="phRight"></span>
+    </div>
+    <div class="print-footer" id="printFooter">
+      <span id="pfLeft"></span>
+      <span id="pfRight"></span>
+    </div>
+
+    <div id="dropzone">
+      <svg width="48" height="48" fill="none" stroke="#aaa" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
+      </svg>
+      <p><strong>Drop a .md file here</strong></p>
+      <p>or use "Open .md File" in the sidebar</p>
+      <p class="hint">You can also paste markdown text with Cmd+V</p>
+      <p class="hint" style="margin-top:8px;">To see hidden files (.claude/) in the file picker:<br><kbd style="background:#eee;padding:1px 4px;border-radius:3px;border:1px solid #ccc;">Cmd+Shift+.</kbd></p>
+    </div>
+    <div id="doc-content" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ============== DYNAMIC PRINT STYLES ============== -->
+<style id="dynamicStyles"></style>
+<style id="printPageStyles"></style>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+let currentFilename = 'document.md';
+let logoDataURL = null;
+let rawMarkdown = '';
+let showPageBreaks = true;
+
+// ============================================================
+//  BUILT-IN THEMES (immutable)
+// ============================================================
+const BUILTIN_THEMES = {
+  'Default': {
+    bodyFont: "'-apple-system', 'Segoe UI', sans-serif", bodySize: 11, bodyColor: '#222222', bodyLineHeight: 1.5,
+    h1Font: "'-apple-system', 'Segoe UI', sans-serif", h1Size: 22, h1Color: '#1a1a2e', h1Margin: 8,
+    h2Font: "'-apple-system', 'Segoe UI', sans-serif", h2Size: 16, h2Color: '#2d3748', h2Margin: 6,
+    h3Font: "'-apple-system', 'Segoe UI', sans-serif", h3Size: 13, h3Color: '#4a5568', h3Margin: 4,
+    codeSize: 9, codeBg: '#f6f8fa',
+    marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
+  },
+  'Ocean Blue': {
+    bodyFont: "'Georgia', serif", bodySize: 11, bodyColor: '#1a202c', bodyLineHeight: 1.55,
+    h1Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h1Size: 24, h1Color: '#1e3a5f', h1Margin: 10,
+    h2Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h2Size: 17, h2Color: '#2c5282', h2Margin: 7,
+    h3Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h3Size: 13, h3Color: '#3182ce', h3Margin: 4,
+    codeSize: 9, codeBg: '#edf2f7',
+    marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
+  },
+  'Forest Green': {
+    bodyFont: "'Charter', 'Bitstream Charter', serif", bodySize: 11, bodyColor: '#1a2e1a', bodyLineHeight: 1.5,
+    h1Font: "'-apple-system', 'Segoe UI', sans-serif", h1Size: 22, h1Color: '#1b4332', h1Margin: 8,
+    h2Font: "'-apple-system', 'Segoe UI', sans-serif", h2Size: 16, h2Color: '#2d6a4f', h2Margin: 6,
+    h3Font: "'-apple-system', 'Segoe UI', sans-serif", h3Size: 13, h3Color: '#40916c', h3Margin: 4,
+    codeSize: 9, codeBg: '#f0faf0',
+    marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
+  },
+  'Warm Amber': {
+    bodyFont: "'Palatino Linotype', 'Book Antiqua', serif", bodySize: 11, bodyColor: '#2d2418', bodyLineHeight: 1.55,
+    h1Font: "'Georgia', serif", h1Size: 23, h1Color: '#7c4a03', h1Margin: 9,
+    h2Font: "'Georgia', serif", h2Size: 16, h2Color: '#b45309', h2Margin: 6,
+    h3Font: "'Georgia', serif", h3Size: 13, h3Color: '#d97706', h3Margin: 4,
+    codeSize: 9, codeBg: '#fef9ee',
+    marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
+  },
+  'Slate Gray': {
+    bodyFont: "'Helvetica Neue', Helvetica, Arial, sans-serif", bodySize: 11, bodyColor: '#2d3748', bodyLineHeight: 1.5,
+    h1Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h1Size: 22, h1Color: '#1a202c', h1Margin: 8,
+    h2Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h2Size: 16, h2Color: '#4a5568', h2Margin: 6,
+    h3Font: "'Helvetica Neue', Helvetica, Arial, sans-serif", h3Size: 13, h3Color: '#718096', h3Margin: 4,
+    codeSize: 9, codeBg: '#edf2f7',
+    marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
+  },
+};
+
+// Custom themes from localStorage
+function getCustomThemes() {
+  try { return JSON.parse(localStorage.getItem('md2print_custom_themes') || '{}'); }
+  catch { return {}; }
+}
+function saveCustomThemes(themes) {
+  localStorage.setItem('md2print_custom_themes', JSON.stringify(themes));
+}
+function getAllThemes() {
+  return { ...BUILTIN_THEMES, ...getCustomThemes() };
+}
+
+// ============================================================
+//  SETTINGS FIELDS
+// ============================================================
+const SETTINGS_FIELDS = [
+  'bodyFont','bodySize','bodyColor','bodyLineHeight',
+  'h1Font','h1Size','h1Color','h1Margin',
+  'h2Font','h2Size','h2Color','h2Margin',
+  'h3Font','h3Size','h3Color','h3Margin',
+  'codeSize','codeBg',
+  'marginTop','marginBottom','marginLeft','marginRight',
+  'headerLeft','headerRight','footerLeft','footerRight'
+];
+
+function getCurrentSettings() {
+  const settings = {};
+  SETTINGS_FIELDS.forEach(f => settings[f] = getVal(f));
+  return settings;
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  buildThemeChips();
+  wireEvents();
+  applyTheme('Default');
+  updatePreview();
+});
+
+// ============================================================
+//  THEME CHIPS — build/rebuild
+// ============================================================
+function buildThemeChips() {
+  const container = document.getElementById('themeChips');
+  container.innerHTML = '';
+  const allThemes = getAllThemes();
+  const customNames = Object.keys(getCustomThemes());
+
+  Object.keys(allThemes).forEach(name => {
+    const chip = document.createElement('span');
+    chip.className = 'theme-chip' + (customNames.includes(name) ? ' custom' : '');
+    chip.textContent = name;
+    chip.onclick = (e) => {
+      if (e.target.classList.contains('delete-x')) return;
+      applyTheme(name);
+    };
+
+    // Delete button for custom themes
+    if (customNames.includes(name)) {
+      const del = document.createElement('span');
+      del.className = 'delete-x';
+      del.textContent = '×';
+      del.title = `Delete "${name}"`;
+      del.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete theme "${name}"?`)) {
+          const custom = getCustomThemes();
+          delete custom[name];
+          saveCustomThemes(custom);
+          buildThemeChips();
+        }
+      };
+      chip.appendChild(del);
+    }
+
+    container.appendChild(chip);
+  });
+}
+
+// ============================================================
+//  THEME MANAGEMENT
+// ============================================================
+function applyTheme(name) {
+  const allThemes = getAllThemes();
+  const t = allThemes[name];
+  if (!t) return;
+  setVal('bodyFont', t.bodyFont); setVal('bodySize', t.bodySize); setVal('bodyColor', t.bodyColor);
+  setVal('bodyLineHeight', t.bodyLineHeight);
+  setVal('h1Font', t.h1Font); setVal('h1Size', t.h1Size); setVal('h1Color', t.h1Color); setVal('h1Margin', t.h1Margin);
+  setVal('h2Font', t.h2Font); setVal('h2Size', t.h2Size); setVal('h2Color', t.h2Color); setVal('h2Margin', t.h2Margin);
+  setVal('h3Font', t.h3Font); setVal('h3Size', t.h3Size); setVal('h3Color', t.h3Color); setVal('h3Margin', t.h3Margin);
+  setVal('codeSize', t.codeSize); setVal('codeBg', t.codeBg);
+  if (t.marginTop !== undefined) setVal('marginTop', t.marginTop);
+  if (t.marginBottom !== undefined) setVal('marginBottom', t.marginBottom);
+  if (t.marginLeft !== undefined) setVal('marginLeft', t.marginLeft);
+  if (t.marginRight !== undefined) setVal('marginRight', t.marginRight);
+  document.querySelectorAll('.theme-chip').forEach(c => c.classList.toggle('active', c.textContent === name || c.firstChild?.textContent === name));
+  updateStyles();
+}
+
+function saveCurrentAsTheme() {
+  const name = prompt('Theme name:');
+  if (!name || !name.trim()) return;
+  if (BUILTIN_THEMES[name]) {
+    alert(`"${name}" is a built-in theme and can't be overwritten. Choose a different name.`);
+    return;
+  }
+  const custom = getCustomThemes();
+  custom[name.trim()] = getCurrentSettings();
+  saveCustomThemes(custom);
+  buildThemeChips();
+  applyTheme(name.trim());
+}
+
+function exportThemes() {
+  const data = {
+    builtinThemes: BUILTIN_THEMES,
+    customThemes: getCustomThemes(),
+    exportedAt: new Date().toISOString(),
+    version: '1.0'
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'md2print-themes.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importThemes(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let imported = 0;
+      // Support both formats: flat themes object or structured export
+      const themes = data.customThemes || data;
+      const custom = getCustomThemes();
+      Object.entries(themes).forEach(([name, settings]) => {
+        // Don't overwrite built-in themes
+        if (BUILTIN_THEMES[name]) return;
+        // Validate it looks like a theme (has at least bodyFont)
+        if (settings.bodyFont || settings.h1Color) {
+          custom[name] = settings;
+          imported++;
+        }
+      });
+      saveCustomThemes(custom);
+      buildThemeChips();
+      alert(`Imported ${imported} custom theme(s).`);
+    } catch (err) {
+      alert('Invalid JSON file. Please use a file exported from MD2Print.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+function getVal(id) { return document.getElementById(id)?.value; }
+function getNum(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+
+// ============================================================
+//  WIRE EVENTS
+// ============================================================
+function wireEvents() {
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  document.getElementById('importInput').addEventListener('change', e => {
+    if (e.target.files[0]) importThemes(e.target.files[0]);
+    e.target.value = ''; // reset so same file can be re-imported
+  });
+
+  document.getElementById('logoInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => { logoDataURL = ev.target.result; updateHeaderFooter(); };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  document.getElementById('headerLeft').addEventListener('change', () => {
+    document.getElementById('logoUploadRow').style.display =
+      document.getElementById('headerLeft').value === 'logo' ? '' : 'none';
+    updateHeaderFooter();
+  });
+
+  // All controls trigger style update
+  const inputs = document.querySelectorAll('#panel input, #panel select');
+  inputs.forEach(inp => inp.addEventListener('change', updateStyles));
+  inputs.forEach(inp => inp.addEventListener('input', updateStyles));
+
+  // Drag and drop
+  const dz = document.getElementById('dropzone');
+  const pw = document.getElementById('preview-wrap');
+  ['dragenter','dragover'].forEach(evt => {
+    pw.addEventListener(evt, e => { e.preventDefault(); if (dz) dz.classList.add('dragover'); });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    pw.addEventListener(evt, e => { e.preventDefault(); if (dz) dz.classList.remove('dragover'); });
+  });
+  pw.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
+      loadFile(file);
+    }
+  });
+
+  // Paste
+  document.addEventListener('paste', e => {
+    const text = e.clipboardData.getData('text/plain');
+    if (text && text.length > 10) {
+      rawMarkdown = text;
+      currentFilename = 'pasted-content.md';
+      renderMarkdown();
+    }
+  });
+}
+
+// ============================================================
+//  PAGE BREAK TOGGLE
+// ============================================================
+function togglePageBreaks() {
+  showPageBreaks = !showPageBreaks;
+  document.getElementById('pageBreakToggle').classList.toggle('on', showPageBreaks);
+  runPaginationAndDraw();
+}
+
+// ============================================================
+//  MASTER PAGINATION PIPELINE
+//  1. Clear previous adjustments
+//  2. Measure all block elements against page boundaries
+//  3. Inject margin-top spacers to push content cleanly
+//  4. Draw page-break indicator lines
+// ============================================================
+function runPaginationAndDraw() {
+  clearPaginationAdjustments();
+  if (showPageBreaks) {
+    paginateContent();
+  }
+  drawPageBreaks();
+}
+
+// ============================================================
+//  INTELLIGENT PAGINATION ENGINE
+// ============================================================
+const PX_PER_INCH = 96;
+// Minimum content a heading needs below it on the same page
+// (heading height + ~3 lines of body text ≈ 72px)
+const MIN_CONTENT_AFTER_HEADING = 72;
+// Breathing room: if heading lands within this many px of page top, add padding
+const TOP_BREATHING_ROOM = 24;
+// Max iterations to prevent infinite loops (content shifts can cascade)
+const MAX_PAGINATION_PASSES = 5;
+
+function getPageContentHeight() {
+  const mt = getNum('marginTop');
+  const mb = getNum('marginBottom');
+  return (11 - mt - mb) * PX_PER_INCH;
+}
+
+function getContentOriginY() {
+  // The Y offset where content begins inside preview-container
+  return getNum('marginTop') * PX_PER_INCH;
+}
+
+function clearPaginationAdjustments() {
+  // Remove all injected pagination spacers and print-break classes
+  document.querySelectorAll('.pagination-spacer, .pagination-break-before').forEach(el => {
+    el.style.marginTop = '';
+    el.classList.remove('pagination-spacer', 'pagination-break-before');
+    el.removeAttribute('data-pagination-push');
+  });
+}
+
+function paginateContent() {
+  const content = document.getElementById('doc-content');
+  if (!content || content.style.display === 'none') return;
+
+  const pageH = getPageContentHeight();
+  if (pageH <= 0) return;
+
+  const containerRect = document.getElementById('preview-container').getBoundingClientRect();
+  const originY = containerRect.top + getContentOriginY();
+
+  // Multi-pass: each push can shift later elements, so re-check
+  for (let pass = 0; pass < MAX_PAGINATION_PASSES; pass++) {
+    let madeChanges = false;
+
+    // Get all direct block-level children of doc-content
+    const blocks = content.children;
+
+    for (let i = 0; i < blocks.length; i++) {
+      const el = blocks[i];
+      const tag = el.tagName;
+      const isHeading = /^H[1-6]$/.test(tag);
+      const isPreOrTable = tag === 'PRE' || tag === 'TABLE';
+
+      // Get element position relative to content origin
+      const rect = el.getBoundingClientRect();
+      const elTop = rect.top - originY;
+      const elBottom = rect.bottom - originY;
+      const elHeight = rect.height;
+
+      // Which page does the top of this element fall on?
+      const pageIndex = Math.floor(elTop / pageH);
+      const pageTopY = pageIndex * pageH;
+      const pageBottomY = (pageIndex + 1) * pageH;
+
+      // Position within the current page
+      const posInPage = elTop - pageTopY;
+      const spaceLeftOnPage = pageBottomY - elTop;
+
+      // ── RULE 1: Heading near bottom of page ──
+      // If a heading is in the bottom zone of a page and there isn't
+      // enough room for the heading + some body text, push it to next page
+      if (isHeading && !el.getAttribute('data-pagination-push')) {
+        // Calculate how much content follows on the same page
+        // (heading height + space for at least a couple lines)
+        const headingPlusMin = elHeight + MIN_CONTENT_AFTER_HEADING;
+
+        if (spaceLeftOnPage < headingPlusMin && spaceLeftOnPage < pageH * 0.85) {
+          // Push this heading to the next page (screen: margin-top, print: page-break-before)
+          const pushAmount = spaceLeftOnPage + TOP_BREATHING_ROOM;
+          el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pushAmount) + 'px';
+          el.classList.add('pagination-spacer', 'pagination-break-before');
+          el.setAttribute('data-pagination-push', pushAmount);
+          madeChanges = true;
+          continue;
+        }
+      }
+
+      // ── RULE 2: Heading too close to top of page ──
+      // If heading is within breathing room of a page start (but not page 1),
+      // add a small pad so it doesn't feel cramped
+      if (isHeading && pageIndex > 0 && !el.getAttribute('data-pagination-push')) {
+        const distFromPageTop = posInPage;
+        if (distFromPageTop > 0 && distFromPageTop < TOP_BREATHING_ROOM) {
+          const pad = TOP_BREATHING_ROOM - distFromPageTop;
+          el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pad) + 'px';
+          el.classList.add('pagination-spacer');
+          el.setAttribute('data-pagination-push', pad);
+          madeChanges = true;
+          continue;
+        }
+      }
+
+      // ── RULE 3: Pre/code block or table split across pages ──
+      // If a code block or table starts near the bottom and would be split,
+      // push it to the next page (only if it fits on one page)
+      if (isPreOrTable && !el.getAttribute('data-pagination-push')) {
+        const isSplit = elTop < pageBottomY && elBottom > pageBottomY;
+        const fitsOnOnePage = elHeight <= pageH * 0.9;
+        // Only push if more than 30% would spill onto next page
+        const spillRatio = (elBottom - pageBottomY) / elHeight;
+
+        if (isSplit && fitsOnOnePage && spillRatio > 0.3) {
+          const pushAmount = pageBottomY - elTop + TOP_BREATHING_ROOM;
+          el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pushAmount) + 'px';
+          el.classList.add('pagination-spacer', 'pagination-break-before');
+          el.setAttribute('data-pagination-push', pushAmount);
+          madeChanges = true;
+          continue;
+        }
+      }
+    }
+
+    // If nothing changed this pass, we're stable
+    if (!madeChanges) break;
+  }
+}
+
+// ============================================================
+//  PAGE BREAK LINES — draw visual indicators
+// ============================================================
+function drawPageBreaks() {
+  // Remove existing lines
+  document.querySelectorAll('.page-break-line').forEach(el => el.remove());
+
+  if (!showPageBreaks) return;
+
+  const container = document.getElementById('preview-container');
+  const content = document.getElementById('doc-content');
+  if (!content || content.style.display === 'none') return;
+
+  const pageH = getPageContentHeight();
+  if (pageH <= 0) return;
+
+  const topOffset = getContentOriginY();
+  const totalHeight = container.scrollHeight;
+
+  let pageNum = 1;
+  let y = topOffset + pageH;
+
+  while (y < totalHeight) {
+    pageNum++;
+    const line = document.createElement('div');
+    line.className = 'page-break-line';
+    line.style.top = y + 'px';
+
+    const label = document.createElement('span');
+    label.className = 'page-break-label';
+    label.textContent = `Page ${pageNum}`;
+    line.appendChild(label);
+
+    container.appendChild(line);
+    y += pageH;
+  }
+}
+
+// ============================================================
+//  FILE LOADING
+// ============================================================
+function loadFile(file) {
+  currentFilename = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    rawMarkdown = e.target.result;
+    renderMarkdown();
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+//  MARKDOWN RENDERING
+// ============================================================
+function renderMarkdown() {
+  if (!rawMarkdown) return;
+
+  marked.setOptions({ breaks: false, gfm: true, headerIds: false, mangle: false });
+
+  const renderer = new marked.Renderer();
+  renderer.code = function(codeObj) {
+    const text = typeof codeObj === 'string' ? codeObj : (codeObj.text || '');
+    const lang = typeof codeObj === 'string' ? '' : (codeObj.lang || '');
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const isAscii = /[┌┐└┘├┤┬┴│─═║╔╗╚╝╠╣╦╩▲▼◄►←→↑↓]/.test(text)
+      || (/\|/.test(text) && /[-─]/.test(text) && text.split('\n').length > 3);
+    const cls = isAscii ? 'ascii-art' : (lang ? `language-${lang}` : '');
+    return `<pre class="${cls}"><code>${escaped}</code></pre>`;
+  };
+
+  const html = marked.parse(rawMarkdown, { renderer });
+
+  document.getElementById('dropzone').style.display = 'none';
+  const content = document.getElementById('doc-content');
+  content.style.display = 'block';
+  content.innerHTML = html;
+
+  updateStyles();
+  updateHeaderFooter();
+}
+
+// ============================================================
+//  DYNAMIC STYLE INJECTION
+// ============================================================
+function updateStyles() {
+  const css = `
+    #doc-content {
+      font-family: ${getVal('bodyFont')};
+      font-size: ${getNum('bodySize')}pt;
+      color: ${getVal('bodyColor')};
+      line-height: ${getNum('bodyLineHeight')};
+    }
+    #doc-content h1 {
+      font-family: ${getVal('h1Font')};
+      font-size: ${getNum('h1Size')}pt;
+      color: ${getVal('h1Color')};
+      margin: 16px 0 ${getNum('h1Margin')}px 0;
+      line-height: 1.2; font-weight: 700;
+    }
+    #doc-content h1:first-child { margin-top: 0; }
+    #doc-content h2 {
+      font-family: ${getVal('h2Font')};
+      font-size: ${getNum('h2Size')}pt;
+      color: ${getVal('h2Color')};
+      margin: 14px 0 ${getNum('h2Margin')}px 0;
+      line-height: 1.25; font-weight: 600;
+    }
+    #doc-content h3 {
+      font-family: ${getVal('h3Font')};
+      font-size: ${getNum('h3Size')}pt;
+      color: ${getVal('h3Color')};
+      margin: 12px 0 ${getNum('h3Margin')}px 0;
+      line-height: 1.3; font-weight: 600;
+    }
+    #doc-content pre {
+      font-size: ${getNum('codeSize')}pt;
+      background: ${getVal('codeBg')};
+    }
+    #doc-content pre.ascii-art {
+      font-size: ${Math.max(getNum('codeSize') - 1, 7)}pt;
+      line-height: 1.25; letter-spacing: 0;
+      overflow-x: visible; white-space: pre; word-wrap: normal;
+    }
+    #doc-content p { margin: 0 0 8px 0; }
+    #doc-content ul, #doc-content ol { margin: 4px 0 8px 0; }
+  `;
+  document.getElementById('dynamicStyles').textContent = css;
+
+  const mt = getNum('marginTop'), mb = getNum('marginBottom');
+  const ml = getNum('marginLeft'), mr = getNum('marginRight');
+  document.getElementById('printPageStyles').textContent = `
+    @media print {
+      @page { margin: ${mt}in ${mr}in ${mb}in ${ml}in; }
+    }
+  `;
+
+  document.getElementById('preview-container').style.padding = `${mt}in ${mr}in ${mb}in ${ml}in`;
+
+  updateHeaderFooter();
+
+  // Run intelligent pagination + redraw page break lines
+  requestAnimationFrame(() => runPaginationAndDraw());
+}
+
+// ============================================================
+//  HEADER / FOOTER
+// ============================================================
+function updateHeaderFooter() {
+  const phLeft = document.getElementById('phLeft');
+  const phRight = document.getElementById('phRight');
+  const pfLeft = document.getElementById('pfLeft');
+  const pfRight = document.getElementById('pfRight');
+
+  const hl = getVal('headerLeft');
+  if (hl === 'logo' && logoDataURL) {
+    phLeft.innerHTML = `<img src="${logoDataURL}" alt="Logo">`;
+  } else {
+    phLeft.textContent = '';
+  }
+
+  const hr = getVal('headerRight');
+  phRight.textContent = hr === 'filename' ? currentFilename : '';
+
+  const fl = getVal('footerLeft');
+  if (fl === 'date') {
+    const now = new Date();
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const dd = String(now.getDate()).padStart(2,'0');
+    const yyyy = now.getFullYear();
+    pfLeft.textContent = `Date: ${mm}-${dd}-${yyyy}`;
+  } else {
+    pfLeft.textContent = '';
+  }
+
+  const fr = getVal('footerRight');
+  pfRight.textContent = fr === 'pagenum' ? 'Page' : '';
+
+  const showHeader = hl !== 'none' || hr !== 'none';
+  const showFooter = fl !== 'none' || fr !== 'none';
+  document.getElementById('printHeader').style.cssText = showHeader ? '' : 'display:none!important';
+  document.getElementById('printFooter').style.cssText = showFooter ? '' : 'display:none!important';
+}
+
+function updatePreview() {
+  updateStyles();
+}
+</script>
+</body>
+</html>

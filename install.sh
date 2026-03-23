@@ -52,6 +52,12 @@ else
   echo "  WARNING: web/index.html not found — web app skipped"
 fi
 
+if [ -f "$SCRIPT_DIR/web/launch.py" ]; then
+  cp "$SCRIPT_DIR/web/launch.py" "$MD2PRINT_DIR/web/launch.py"
+  chmod +x "$MD2PRINT_DIR/web/launch.py"
+  echo "  Copied web/launch.py  → $MD2PRINT_DIR/web/"
+fi
+
 # 3. Create the Quick Action (Automator workflow)
 echo ""
 echo "Installing Quick Action: '$WORKFLOW_NAME' ..."
@@ -125,17 +131,7 @@ cat > "$WORKFLOW_PATH/Contents/document.wflow" << 'WFLOW_EOF'
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>TOOL="$HOME/Documents/MD2Print/md2print.py"
-for f in "$@"; do
-    case "$f" in
-        *.md|*.markdown|*.txt)
-            OUT=$(/usr/bin/python3 "$TOOL" "$f" --no-open 2>&amp;1 | grep "^Generated:" | sed "s/^Generated: //")
-            if [ -n "$OUT" ]; then
-                open "file://$OUT"
-            fi
-            ;;
-    esac
-done
+					<string>/usr/bin/python3 "$HOME/Documents/MD2Print/web/launch.py" "$@"
 </string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>

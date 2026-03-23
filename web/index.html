@@ -507,6 +507,22 @@ document.addEventListener('DOMContentLoaded', () => {
   wireEvents();
   applyTheme('Default');
   updatePreview();
+
+  // Auto-load markdown passed via localStorage (from Quick Action or external launcher)
+  const preload = localStorage.getItem('md2print_preload');
+  if (preload) {
+    try {
+      const data = JSON.parse(preload);
+      localStorage.removeItem('md2print_preload');
+      if (data.content) {
+        rawMarkdown = data.content;
+        currentFilename = data.filename || 'document.md';
+        renderMarkdown();
+      }
+    } catch(e) {
+      localStorage.removeItem('md2print_preload');
+    }
+  }
 });
 
 // ============================================================

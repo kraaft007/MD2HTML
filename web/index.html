@@ -780,60 +780,71 @@ function paginateContent() {
   const containerRect = document.getElementById('preview-container').getBoundingClientRect();
   const originY = containerRect.top + getContentOriginY();
 
+  // Helper: get element's position relative to content origin
+  function getPos(el) {
+    const rect = el.getBoundingClientRect();
+    const elTop = rect.top - originY;
+    const elBottom = rect.bottom - originY;
+    const pageIndex = Math.floor(elTop / pageH);
+    const pageBottomY = (pageIndex + 1) * pageH;
+    return { elTop, elBottom, elHeight: rect.height, pageIndex,
+             pageTopY: pageIndex * pageH, pageBottomY,
+             posInPage: elTop - pageIndex * pageH,
+             spaceLeft: pageBottomY - elTop };
+  }
+
+  // Helper: push an element to the next page
+  function pushElement(el, pushAmount) {
+    el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pushAmount) + 'px';
+    el.classList.add('pagination-spacer', 'pagination-break-before');
+    el.setAttribute('data-pagination-push', pushAmount);
+  }
+
+  // Helper: check if element straddles a page boundary
+  function straddlesBoundary(p) {
+    return p.elTop < p.pageBottomY && p.elBottom > p.pageBottomY;
+  }
+
   // Multi-pass: each push can shift later elements, so re-check
   for (let pass = 0; pass < MAX_PAGINATION_PASSES; pass++) {
     let madeChanges = false;
 
-    // Get all direct block-level children of doc-content
+    // Collect all elements to check: direct children + nested li, tr, p
+    const allElements = [];
     const blocks = content.children;
-
     for (let i = 0; i < blocks.length; i++) {
-      const el = blocks[i];
+      allElements.push(blocks[i]);
+      // Also collect nested list items and table rows
+      const nested = blocks[i].querySelectorAll('li, tr');
+      nested.forEach(n => allElements.push(n));
+    }
+
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (el.getAttribute('data-pagination-push')) continue;
+
       const tag = el.tagName;
       const isHeading = /^H[1-6]$/.test(tag);
       const isPreOrTable = tag === 'PRE' || tag === 'TABLE';
+      const isListItem = tag === 'LI';
+      const isListContainer = tag === 'UL' || tag === 'OL';
 
-      // Get element position relative to content origin
-      const rect = el.getBoundingClientRect();
-      const elTop = rect.top - originY;
-      const elBottom = rect.bottom - originY;
-      const elHeight = rect.height;
-
-      // Which page does the top of this element fall on?
-      const pageIndex = Math.floor(elTop / pageH);
-      const pageTopY = pageIndex * pageH;
-      const pageBottomY = (pageIndex + 1) * pageH;
-
-      // Position within the current page
-      const posInPage = elTop - pageTopY;
-      const spaceLeftOnPage = pageBottomY - elTop;
+      const p = getPos(el);
 
       // ── RULE 1: Heading near bottom of page ──
-      // If a heading is in the bottom zone of a page and there isn't
-      // enough room for the heading + some body text, push it to next page
-      if (isHeading && !el.getAttribute('data-pagination-push')) {
-        // Calculate how much content follows on the same page
-        // (heading height + space for at least a couple lines)
-        const headingPlusMin = elHeight + MIN_CONTENT_AFTER_HEADING;
-
-        if (spaceLeftOnPage < headingPlusMin && spaceLeftOnPage < pageH * 0.85) {
-          // Push this heading to the next page (screen: margin-top, print: page-break-before)
-          const pushAmount = spaceLeftOnPage + TOP_BREATHING_ROOM;
-          el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pushAmount) + 'px';
-          el.classList.add('pagination-spacer', 'pagination-break-before');
-          el.setAttribute('data-pagination-push', pushAmount);
+      if (isHeading) {
+        const headingPlusMin = p.elHeight + MIN_CONTENT_AFTER_HEADING;
+        if (p.spaceLeft < headingPlusMin && p.spaceLeft < pageH * 0.85) {
+          pushElement(el, p.spaceLeft + TOP_BREATHING_ROOM);
           madeChanges = true;
           continue;
         }
       }
 
       // ── RULE 2: Heading too close to top of page ──
-      // If heading is within breathing room of a page start (but not page 1),
-      // add a small pad so it doesn't feel cramped
-      if (isHeading && pageIndex > 0 && !el.getAttribute('data-pagination-push')) {
-        const distFromPageTop = posInPage;
-        if (distFromPageTop > 0 && distFromPageTop < TOP_BREATHING_ROOM) {
-          const pad = TOP_BREATHING_ROOM - distFromPageTop;
+      if (isHeading && p.pageIndex > 0) {
+        if (p.posInPage > 0 && p.posInPage < TOP_BREATHING_ROOM) {
+          const pad = TOP_BREATHING_ROOM - p.posInPage;
           el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pad) + 'px';
           el.classList.add('pagination-spacer');
           el.setAttribute('data-pagination-push', pad);
@@ -843,26 +854,74 @@ function paginateContent() {
       }
 
       // ── RULE 3: Pre/code block or table split across pages ──
-      // If a code block or table starts near the bottom and would be split,
-      // push it to the next page (only if it fits on one page)
-      if (isPreOrTable && !el.getAttribute('data-pagination-push')) {
-        const isSplit = elTop < pageBottomY && elBottom > pageBottomY;
-        const fitsOnOnePage = elHeight <= pageH * 0.9;
-        // Only push if more than 30% would spill onto next page
-        const spillRatio = (elBottom - pageBottomY) / elHeight;
+      // If it fits on one page, push it. If too large, try to align
+      // the break with a line boundary inside the block.
+      if (isPreOrTable) {
+        const isSplit = straddlesBoundary(p);
+        const fitsOnOnePage = p.elHeight <= pageH * 0.9;
 
-        if (isSplit && fitsOnOnePage && spillRatio > 0.3) {
-          const pushAmount = pageBottomY - elTop + TOP_BREATHING_ROOM;
-          el.style.marginTop = (parseFloat(el.style.marginTop || 0) + pushAmount) + 'px';
-          el.classList.add('pagination-spacer', 'pagination-break-before');
-          el.setAttribute('data-pagination-push', pushAmount);
+        if (isSplit && fitsOnOnePage) {
+          const spillRatio = (p.elBottom - p.pageBottomY) / p.elHeight;
+          if (spillRatio > 0.3) {
+            pushElement(el, p.pageBottomY - p.elTop + TOP_BREATHING_ROOM);
+            madeChanges = true;
+            continue;
+          }
+        }
+
+        // Large code block spanning multiple pages — nudge so page breaks
+        // fall between lines rather than through them
+        if (isSplit && !fitsOnOnePage && tag === 'PRE') {
+          const codeEl = el.querySelector('code') || el;
+          const style = window.getComputedStyle(codeEl);
+          const lineH = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4;
+          if (lineH > 0) {
+            // How far into the code block does the page break fall?
+            const breakInBlock = p.pageBottomY - p.elTop;
+            // Padding-top of the pre element
+            const prePadTop = parseFloat(window.getComputedStyle(el).paddingTop) || 0;
+            const contentStart = breakInBlock - prePadTop;
+            // Which line does the break fall on?
+            const linePos = contentStart % lineH;
+            // If the break is in the middle of a line (not near top/bottom),
+            // nudge the block down so the break falls between lines
+            if (linePos > lineH * 0.15 && linePos < lineH * 0.85) {
+              const nudge = lineH - linePos + 2; // +2px breathing room
+              el.style.marginTop = (parseFloat(el.style.marginTop || 0) + nudge) + 'px';
+              el.classList.add('pagination-spacer');
+              el.setAttribute('data-pagination-push', nudge);
+              madeChanges = true;
+              continue;
+            }
+          }
+        }
+      }
+
+      // ── RULE 4: List item split across pages ──
+      // If a single <li> straddles a page boundary, push it to the next page
+      // (only if the li is small enough to fit)
+      if (isListItem && straddlesBoundary(p)) {
+        const fitsOnOnePage = p.elHeight <= pageH * 0.5;
+        if (fitsOnOnePage) {
+          pushElement(el, p.pageBottomY - p.elTop + 4);
+          madeChanges = true;
+          continue;
+        }
+      }
+
+      // ── RULE 5: Small list near bottom of page ──
+      // If an entire ul/ol is small and would split, push the whole list
+      if (isListContainer && straddlesBoundary(p)) {
+        const fitsOnOnePage = p.elHeight <= pageH * 0.5;
+        const spillRatio = (p.elBottom - p.pageBottomY) / p.elHeight;
+        if (fitsOnOnePage && spillRatio > 0.2) {
+          pushElement(el, p.pageBottomY - p.elTop + TOP_BREATHING_ROOM);
           madeChanges = true;
           continue;
         }
       }
     }
 
-    // If nothing changed this pass, we're stable
     if (!madeChanges) break;
   }
 }

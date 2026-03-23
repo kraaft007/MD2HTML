@@ -2,10 +2,11 @@
 
 Convert Markdown files to print-optimized HTML with themes, headers/footers, and intelligent pagination.
 
-Three ways to use it:
+Four ways to use it:
 
 | Mode | What it does |
 |---|---|
+| **App Icon** | Double-click `MD2Print.app` (or pin to Dock) to launch the web app |
 | **Quick Action** | Right-click `.md` files in Finder → "Convert to Print HTML" |
 | **CLI** | `python3 md2print.py notes.md --theme ocean` |
 | **Web App** | Drag-and-drop GUI with live preview and Cmd+P printing |
@@ -19,7 +20,10 @@ chmod +x install.sh
 ./install.sh
 ```
 
-This copies the tool to `~/Documents/MD2Print/` and installs a Finder Quick Action.
+This installs:
+- `~/Documents/MD2Print/` — CLI tool and web app files
+- `~/Applications/MD2Print.app` — clickable app icon (drag to Dock)
+- Finder Quick Action — right-click `.md` files to convert
 
 ## Quick Action (Finder)
 

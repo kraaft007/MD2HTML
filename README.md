@@ -1,17 +1,10 @@
 # MD2Print
 
-Convert Markdown files to print-optimized HTML with themes, headers/footers, and intelligent pagination.
+Convert Markdown files to print-optimized HTML with themes, page headers/footers, and intelligent pagination.
 
-Four ways to use it:
+**Zero dependencies.** Pure Python CLI + standalone browser GUI. Works on any Mac out of the box.
 
-| Mode | What it does |
-|---|---|
-| **App Icon** | Double-click `MD2Print.app` (or pin to Dock) to launch the web app |
-| **Quick Action** | Right-click `.md` files in Finder → "Convert to Print HTML" |
-| **CLI** | `python3 md2print.py notes.md --theme ocean` |
-| **Web App** | Drag-and-drop GUI with live preview and Cmd+P printing |
-
-## Install (macOS)
+## Quick Start
 
 ```bash
 git clone https://github.com/kraaft007/MD2HTML.git
@@ -20,74 +13,72 @@ chmod +x install.sh
 ./install.sh
 ```
 
-This installs:
-- `~/Documents/MD2Print/` — CLI tool and web app files
-- `~/Applications/MD2Print.app` — clickable app icon (drag to Dock)
-- Finder Quick Action — right-click `.md` files to convert
+The installer sets up everything on your Mac in one step:
 
-## Quick Action (Finder)
-
-After running `install.sh`:
-
-1. Select one or more `.md`, `.txt`, or `.markdown` files in Finder
-2. Right-click → Quick Actions → **Convert to Print HTML**
-3. Each file converts and opens as print-ready HTML in your browser
-4. Press **Cmd+P** to print or save as PDF
-
-## CLI Usage
-
-```bash
-python3 md2print.py notes.md                        # Default theme, opens browser
-python3 md2print.py notes.md --theme ocean           # Ocean Blue theme
-python3 md2print.py notes.md --theme forest -o out.html  # Save to specific file
-python3 md2print.py notes.md --no-open               # Convert without opening
-python3 md2print.py --list-themes                     # Show available themes
-```
-
-### Themes
-
-| Theme | Style |
+| What gets installed | Where |
 |---|---|
-| `default` | System sans-serif, neutral dark headings |
-| `ocean` | Georgia body, blue heading hierarchy |
-| `forest` | Charter body, green heading hierarchy |
-| `amber` | Palatino body, warm amber headings |
-| `slate` | Helvetica, cool gray tones |
+| **MD2Print.app** | `~/Applications/` — double-click or drag to Dock |
+| **CLI tool** | `~/Documents/MD2Print/md2print.py` |
+| **Web app** | `~/Documents/MD2Print/web/index.html` |
+| **Quick Action** | `~/Library/Services/` — right-click in Finder |
 
-### Style Overrides
+## Four Ways to Use It
+
+### 1. App Icon
+
+Double-click **MD2Print** in `~/Applications` to launch the web app. Drag it to your Dock for one-click access.
+
+### 2. Quick Action (Finder)
+
+Select one or more `.md`, `.txt`, or `.markdown` files in Finder, right-click, and choose **Quick Actions > Convert to Print HTML**. Each file is converted and opened in your browser, ready for Cmd+P.
+
+### 3. Command Line
 
 ```bash
-python3 md2print.py notes.md --h1-color '#c0392b' --body-size 12
-python3 md2print.py notes.md --margin 0.75 --code-size 10
-python3 md2print.py notes.md --header-left logo --logo company.png
+python3 md2print.py notes.md                          # Default theme, opens browser
+python3 md2print.py notes.md --theme ocean             # Ocean Blue theme
+python3 md2print.py notes.md -o report.html            # Save to specific file
+python3 md2print.py notes.md --no-open                 # Convert without opening
+python3 md2print.py --list-themes                      # Show all themes
 ```
 
-Run `python3 md2print.py --help` for all options.
+### 4. Web App (Drag & Drop)
 
-## Web App
+Open `web/index.html` in any browser. Drag in `.md` files or paste markdown text. Customize fonts, colors, margins, and headers/footers in real time. Print with Cmd+P.
 
-Open `web/index.html` in any browser (or after install: `open ~/Documents/MD2Print/web/index.html`).
+## Built-in Themes
 
-- Drag and drop `.md` files or paste markdown text
-- Live preview with page-break indicators
-- Full theme customization panel (fonts, colors, sizes, margins)
-- Save/export custom themes as JSON
-- Print directly with Cmd+P
+| Theme | Body Font | Heading Colors | Character |
+|---|---|---|---|
+| **default** | System sans-serif | Dark neutral | Clean, modern |
+| **ocean** | Georgia (serif) | Blue hierarchy | Professional, calm |
+| **forest** | Charter (serif) | Green hierarchy | Earthy, natural |
+| **amber** | Palatino (serif) | Warm amber | Classic, warm |
+| **slate** | Helvetica | Cool gray | Minimal, corporate |
 
 ## Requirements
 
-- **Python 3.6+** (ships with macOS) — no pip dependencies
-- **macOS** for Quick Action (CLI and web app work on any OS)
+- **macOS** with Python 3.6+ (ships with macOS)
+- No `pip install`, no virtual environments, no node modules
+- Quick Action and App require macOS; CLI and web app work on any OS
 
 ## Project Structure
 
 ```
 MD2HTML/
-├── md2print.py          CLI converter (pure Python, zero dependencies)
+├── md2print.py        CLI converter (pure Python, zero dependencies)
 ├── web/
-│   └── index.html       Standalone browser GUI
-├── install.sh           macOS Quick Action installer
+│   └── index.html     Standalone browser GUI
+├── install.sh         macOS one-step installer
 └── examples/
-    ├── Guide-Lessons1.md        Sample markdown
-    └── Notion-Guide-Lessons1.pdf  Sample PDF source
+    ├── Guide-Lessons1.md
+    └── Notion-Guide-Lessons1.pdf
 ```
+
+## Documentation
+
+See [Operators Manual](Operators-Manual.md) for the full reference: all CLI flags, theme customization, web app features, header/footer configuration, and troubleshooting.
+
+## License
+
+MIT

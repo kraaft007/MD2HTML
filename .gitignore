@@ -5,6 +5,6 @@
 .claude/
 audit.jsonl
 
-# Sample outputs (regenerable)
-outputs/Guide-Lessons1-*.print.html
-outputs/Guide-Lessons1.md
+# Generated outputs (regenerable)
+outputs/
+*.print.html

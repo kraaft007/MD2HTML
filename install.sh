@@ -1,50 +1,54 @@
 #!/bin/bash
 # ============================================================
-#  MD2Print — macOS Quick Action Installer
+#  MD2Print — macOS Installer
 #
-#  What this does:
-#    1. Creates ~/Documents/MD2Print/ (your home for the tool)
-#    2. Copies md2print.html there (if in same directory)
-#    3. Installs a macOS Quick Action (right-click → "Open in MD2Print")
-#       that works on .md, .txt, and .markdown files in Finder
+#  Installs two things:
+#    1. CLI tool  → ~/Documents/MD2Print/md2print.py
+#       Web app   → ~/Documents/MD2Print/web/index.html
+#    2. Quick Action → right-click .md/.txt/.markdown in Finder
+#       → converts each selected file to print-ready HTML
+#       → opens the HTML(s) in your default browser
 #
 #  Usage:
-#    chmod +x install-md2print-service.sh
-#    ./install-md2print-service.sh
+#    chmod +x install.sh && ./install.sh
 #
-#  After running, right-click any .md file in Finder →
-#    Quick Actions → "Open in MD2Print"
+#  After running:
+#    • Right-click .md file(s) in Finder →
+#      Quick Actions → "Convert to Print HTML"
+#    • CLI: python3 ~/Documents/MD2Print/md2print.py <file.md>
+#    • Web: open ~/Documents/MD2Print/web/index.html
 # ============================================================
 
 set -e
 
 MD2PRINT_DIR="$HOME/Documents/MD2Print"
 SERVICES_DIR="$HOME/Library/Services"
-WORKFLOW_NAME="Open in MD2Print.workflow"
+WORKFLOW_NAME="Convert to Print HTML.workflow"
 WORKFLOW_PATH="$SERVICES_DIR/$WORKFLOW_NAME"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== MD2Print Installer ==="
 echo ""
 
-# 1. Create MD2Print directory
+# 1. Create install directory
 echo "Creating $MD2PRINT_DIR ..."
-mkdir -p "$MD2PRINT_DIR"
+mkdir -p "$MD2PRINT_DIR/web"
 
-# 2. Copy md2print.html if present in current directory
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SCRIPT_DIR/md2print.html" ]; then
-  cp "$SCRIPT_DIR/md2print.html" "$MD2PRINT_DIR/md2print.html"
-  echo "  Copied md2print.html → $MD2PRINT_DIR/"
-else
-  echo "  ⚠ md2print.html not found in current directory."
-  echo "    Please copy it to $MD2PRINT_DIR/ manually."
-fi
-
-# Also copy md2print.py if present
+# 2. Copy tool files
 if [ -f "$SCRIPT_DIR/md2print.py" ]; then
   cp "$SCRIPT_DIR/md2print.py" "$MD2PRINT_DIR/md2print.py"
   chmod +x "$MD2PRINT_DIR/md2print.py"
-  echo "  Copied md2print.py → $MD2PRINT_DIR/"
+  echo "  Copied md2print.py  → $MD2PRINT_DIR/"
+else
+  echo "  ERROR: md2print.py not found next to install.sh"
+  exit 1
+fi
+
+if [ -f "$SCRIPT_DIR/web/index.html" ]; then
+  cp "$SCRIPT_DIR/web/index.html" "$MD2PRINT_DIR/web/index.html"
+  echo "  Copied web/index.html → $MD2PRINT_DIR/web/"
+else
+  echo "  WARNING: web/index.html not found — web app skipped"
 fi
 
 # 3. Create the Quick Action (Automator workflow)
@@ -52,13 +56,10 @@ echo ""
 echo "Installing Quick Action: '$WORKFLOW_NAME' ..."
 mkdir -p "$SERVICES_DIR"
 
-# Remove old version if exists
 [ -d "$WORKFLOW_PATH" ] && rm -rf "$WORKFLOW_PATH"
-
-# Create workflow bundle structure
 mkdir -p "$WORKFLOW_PATH/Contents"
 
-# document.wflow — the Automator workflow definition
+# document.wflow — Automator workflow that runs md2print.py on each file
 cat > "$WORKFLOW_PATH/Contents/document.wflow" << 'WFLOW_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -123,8 +124,16 @@ cat > "$WORKFLOW_PATH/Contents/document.wflow" << 'WFLOW_EOF'
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>for f in "$@"; do
-    open -a Safari "$HOME/Documents/MD2Print/md2print.html"
+					<string>TOOL="$HOME/Documents/MD2Print/md2print.py"
+for f in "$@"; do
+    case "$f" in
+        *.md|*.markdown|*.txt)
+            OUT=$(/usr/bin/python3 "$TOOL" "$f" --no-open 2>&amp;1 | grep "^Generated:" | sed "s/^Generated: //")
+            if [ -n "$OUT" ]; then
+                open "file://$OUT"
+            fi
+            ;;
+    esac
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>
@@ -208,7 +217,7 @@ done
 </plist>
 WFLOW_EOF
 
-# Info.plist
+# Info.plist — file types that trigger the Quick Action
 cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'PLIST_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -220,7 +229,7 @@ cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'PLIST_EOF'
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Open in MD2Print</string>
+				<string>Convert to Print HTML</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
@@ -243,7 +252,7 @@ PLIST_EOF
 
 echo "  Quick Action installed at: $WORKFLOW_PATH"
 
-# 4. Refresh services
+# 4. Refresh services cache
 echo ""
 echo "Refreshing macOS services cache..."
 /System/Library/CoreServices/pbs -flush 2>/dev/null || true
@@ -251,19 +260,24 @@ echo "Refreshing macOS services cache..."
 echo ""
 echo "=== Installation Complete ==="
 echo ""
-echo "Your files:"
-echo "  Tool:         $MD2PRINT_DIR/md2print.html"
-echo "  CLI:          $MD2PRINT_DIR/md2print.py"
-echo "  Themes:       $MD2PRINT_DIR/ (export .json files here)"
+echo "Files installed:"
+echo "  CLI tool:     $MD2PRINT_DIR/md2print.py"
+echo "  Web app:      $MD2PRINT_DIR/web/index.html"
 echo "  Quick Action: $WORKFLOW_PATH"
 echo ""
-echo "Usage:"
-echo "  1. Double-click md2print.html to open in Safari"
-echo "  2. Right-click any .md file → Quick Actions → 'Open in MD2Print'"
-echo "  3. CLI: python3 ~/Documents/MD2Print/md2print.py <file.md>"
+echo "Three ways to use MD2Print:"
 echo ""
-echo "Note: The Quick Action opens MD2Print in Safari. You'll still"
-echo "      need to drag the .md file into the tool (macOS security"
-echo "      prevents auto-loading local files). A future version could"
-echo "      use a local server to bypass this."
+echo "  1. QUICK ACTION (Finder)"
+echo "     Select one or more .md files → right-click →"
+echo "     Quick Actions → 'Convert to Print HTML'"
+echo "     Each file converts and opens as print-ready HTML."
+echo ""
+echo "  2. CLI"
+echo "     python3 ~/Documents/MD2Print/md2print.py notes.md"
+echo "     python3 ~/Documents/MD2Print/md2print.py notes.md --theme ocean"
+echo "     python3 ~/Documents/MD2Print/md2print.py --list-themes"
+echo ""
+echo "  3. WEB APP (drag & drop)"
+echo "     open ~/Documents/MD2Print/web/index.html"
+echo "     Drop .md files into the browser for live-preview formatting."
 echo ""

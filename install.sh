@@ -218,7 +218,9 @@ done
 </plist>
 WFLOW_EOF
 
-# Info.plist — file types that trigger the Quick Action
+# Info.plist — modeled after working Quick Actions on this Mac
+# Uses public.item (accepts any file) and NSApplicationIdentifier
+# to scope to Finder. The shell script filters by extension.
 cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'PLIST_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -227,6 +229,10 @@ cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'PLIST_EOF'
 	<key>NSServices</key>
 	<array>
 		<dict>
+			<key>NSBackgroundColorName</key>
+			<string>background</string>
+			<key>NSIconName</key>
+			<string>NSActionTemplate</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
@@ -236,14 +242,12 @@ cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'PLIST_EOF'
 			<string>runWorkflowAsService</string>
 			<key>NSRequiredContext</key>
 			<dict>
-				<key>NSTextContent</key>
-				<string>FilePath</string>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
 			</dict>
 			<key>NSSendFileTypes</key>
 			<array>
-				<string>net.daringfireball.markdown</string>
-				<string>public.plain-text</string>
-				<string>public.text</string>
+				<string>public.item</string>
 			</array>
 		</dict>
 	</array>

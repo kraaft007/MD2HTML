@@ -43,7 +43,7 @@ chmod +x install.sh
 1. Copies `md2print.py` to `~/Documents/MD2Print/`
 2. Copies `web/index.html` to `~/Documents/MD2Print/web/`
 3. Creates a Finder Quick Action at `~/Library/Services/`
-4. Creates `MD2Print.app` at `~/Applications/`
+4. Creates `MD2Print.app` at `/Applications/`
 5. Generates a custom app icon (requires PyObjC; falls back to default icon)
 6. Flushes the macOS services cache so the Quick Action appears immediately
 
@@ -155,7 +155,7 @@ Any of these methods:
 
 ```bash
 # Via the app icon
-open ~/Applications/MD2Print.app
+open /Applications/MD2Print.app
 
 # Directly
 open ~/Documents/MD2Print/web/index.html
@@ -487,12 +487,12 @@ The Quick Action uses the **default** theme. To use a different theme, use the C
 ### Location
 
 ```
-~/Applications/MD2Print.app
+/Applications/MD2Print.app
 ```
 
 ### Dock Access
 
-Drag `MD2Print.app` from `~/Applications/` to your Dock for one-click access.
+Drag `MD2Print.app` from `/Applications/` to your Dock for one-click access.
 
 ### Icon
 
@@ -505,7 +505,7 @@ The installer generates a custom blue icon with "MD / → HTML / PRINT" text usi
 ### After Installation
 
 ```
-~/Applications/
+/Applications/
   └── MD2Print.app                     Clickable app launcher
 
 ~/Documents/MD2Print/
@@ -603,7 +603,7 @@ Use **Export JSON** to back up custom themes.
 Remove all installed files:
 
 ```bash
-rm -rf ~/Applications/MD2Print.app
+rm -rf /Applications/MD2Print.app
 rm -rf ~/Documents/MD2Print
 rm -rf ~/Library/Services/"Convert to Print HTML.workflow"
 ```

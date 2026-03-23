@@ -7,14 +7,14 @@
 #    2. Web app    → ~/Documents/MD2Print/web/index.html
 #    3. Quick Action → right-click .md files in Finder →
 #       "Convert to Print HTML" (single or multi-select)
-#    4. App icon   → ~/Applications/MD2Print.app
+#    4. App icon   → /Applications/MD2Print.app
 #       (double-click or drag to Dock to launch web app)
 #
 #  Usage:
 #    chmod +x install.sh && ./install.sh
 #
 #  After running:
-#    • Double-click MD2Print in ~/Applications (or Dock)
+#    • Double-click MD2Print in /Applications (or Dock)
 #    • Right-click .md file(s) in Finder →
 #      Quick Actions → "Convert to Print HTML"
 #    • CLI: python3 ~/Documents/MD2Print/md2print.py <file.md>
@@ -254,14 +254,18 @@ PLIST_EOF
 echo "  Quick Action installed at: $WORKFLOW_PATH"
 
 # 4. Create MD2Print.app (clickable launcher for the web app)
-APP_PATH="$HOME/Applications/MD2Print.app"
+APP_PATH="/Applications/MD2Print.app"
 echo ""
 echo "Creating MD2Print.app ..."
-mkdir -p "$HOME/Applications"
+mkdir -p /Applications 2>/dev/null || true
 
 # osacompile creates a signed AppleScript app that macOS trusts natively
 [ -d "$APP_PATH" ] && rm -rf "$APP_PATH"
 osacompile -o "$APP_PATH" -e 'do shell script "open $HOME/Documents/MD2Print/web/index.html"' 2>/dev/null
+
+# Add CFBundleIdentifier so Spotlight can index the app
+/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.md2print.app" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string MD2Print" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true
 
 # Generate a custom icon using macOS PyObjC (available on all Macs)
 python3 << 'ICON_PYEOF'
@@ -324,7 +328,7 @@ try:
         data = rep.representationUsingType_properties_(NSPNGFileType, {})
         data.writeToFile_atomically_(os.path.join(iconset, name), True)
 
-    icns_path = os.path.expanduser("~/Applications/MD2Print.app/Contents/Resources/applet.icns")
+    icns_path = "/Applications/MD2Print.app/Contents/Resources/applet.icns"
     subprocess.run(["iconutil", "-c", "icns", iconset, "-o", icns_path], check=True)
     print("  Custom icon applied")
 except Exception as e:
@@ -351,7 +355,7 @@ echo ""
 echo "Four ways to use MD2Print:"
 echo ""
 echo "  1. APP ICON"
-echo "     Double-click MD2Print in ~/Applications"
+echo "     Double-click MD2Print in /Applications"
 echo "     (drag to Dock for one-click access)"
 echo ""
 echo "  2. QUICK ACTION (Finder)"

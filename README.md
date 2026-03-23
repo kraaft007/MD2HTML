@@ -17,7 +17,7 @@ The installer sets up everything on your Mac in one step:
 
 | What gets installed | Where |
 |---|---|
-| **MD2Print.app** | `~/Applications/` — double-click or drag to Dock |
+| **MD2Print.app** | `/Applications/` — double-click or drag to Dock |
 | **CLI tool** | `~/Documents/MD2Print/md2print.py` |
 | **Web app** | `~/Documents/MD2Print/web/index.html` |
 | **Quick Action** | `~/Library/Services/` — right-click in Finder |
@@ -26,7 +26,7 @@ The installer sets up everything on your Mac in one step:
 
 ### 1. App Icon
 
-Double-click **MD2Print** in `~/Applications` to launch the web app. Drag it to your Dock for one-click access.
+Double-click **MD2Print** in `/Applications` to launch the web app. Drag it to your Dock for one-click access.
 
 ### 2. Quick Action (Finder)
 

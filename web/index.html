@@ -229,7 +229,8 @@ body {
 <!-- ============== SETTINGS PANEL ============== -->
 <div id="panel">
   <h2>MD2Print</h2>
-  <p style="font-size:11px;color:#888;margin:0 0 4px 0;">Markdown to print-optimized HTML</p>
+  <p style="font-size:11px;color:#888;margin:0 0 2px 0;">Markdown to print-optimized HTML</p>
+  <p id="sourcePathDisplay" style="font-size:10px;color:#666;margin:0 0 4px 0;word-break:break-all;display:none;background:#f0f4ff;padding:3px 6px;border-radius:4px;border:1px solid #e0e4ee;font-family:'SF Mono','Menlo',monospace;"></p>
 
   <button class="btn btn-secondary" id="btnLoad" onclick="document.getElementById('fileInput').click()">
     Open .md File
@@ -418,6 +419,7 @@ body {
 //  STATE
 // ============================================================
 let currentFilename = 'document.md';
+let currentSourcePath = '';
 let logoDataURL = null;
 let rawMarkdown = '';
 let showPageBreaks = true;
@@ -517,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.content) {
         rawMarkdown = data.content;
         currentFilename = data.filename || 'document.md';
+        updateSourcePath(data.path || '');
         renderMarkdown();
       }
     } catch(e) {
@@ -645,6 +648,24 @@ function importThemes(file) {
 }
 
 // ============================================================
+//  SOURCE PATH DISPLAY
+// ============================================================
+function updateSourcePath(path) {
+  currentSourcePath = path || '';
+  const el = document.getElementById('sourcePathDisplay');
+  if (currentSourcePath) {
+    // Shorten home dir to ~
+    let display = currentSourcePath;
+    const home = currentSourcePath.match(/^\/Users\/[^/]+/);
+    if (home) display = display.replace(home[0], '~');
+    el.textContent = display;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// ============================================================
 //  HELPERS
 // ============================================================
 function setVal(id, val) {
@@ -709,6 +730,7 @@ function wireEvents() {
     if (text && text.length > 10) {
       rawMarkdown = text;
       currentFilename = 'pasted-content.md';
+      updateSourcePath('(pasted content)');
       renderMarkdown();
     }
   });
@@ -1002,6 +1024,9 @@ function drawPageBreaks() {
 // ============================================================
 function loadFile(file) {
   currentFilename = file.name;
+  // Browser security prevents access to full path, but webkitRelativePath
+  // may have partial info. Show what we can.
+  updateSourcePath(file.webkitRelativePath || file.name);
   const reader = new FileReader();
   reader.onload = e => {
     rawMarkdown = e.target.result;

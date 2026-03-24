@@ -20,7 +20,8 @@ WEBAPP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 def launch_file(filepath):
     fname = os.path.basename(filepath)
     content = open(filepath, "r", encoding="utf-8").read()
-    payload = json.dumps({"filename": fname, "content": content})
+    fullpath = os.path.abspath(filepath)
+    payload = json.dumps({"filename": fname, "path": fullpath, "content": content})
 
     launcher_html = (
         "<!DOCTYPE html>\n"

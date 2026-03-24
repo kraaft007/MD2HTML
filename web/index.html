@@ -182,7 +182,6 @@ body {
   .print-header img { height: 18px; }
 
   #doc-content pre { page-break-inside: avoid; }
-  #doc-content table { page-break-inside: avoid; }
   #doc-content tr { page-break-inside: avoid; }
   #doc-content li { page-break-inside: avoid; }
   #doc-content h1, #doc-content h2, #doc-content h3 { page-break-after: avoid; }
@@ -1183,6 +1182,38 @@ function updateHeaderFooter() {
 function updatePreview() {
   updateStyles();
 }
+
+// ============================================================
+//  PRINT: strip pagination spacers from DOM before printing,
+//  restore after. CSS !important alone is unreliable — some
+//  browsers compute layout from inline styles before applying
+//  stylesheet overrides, causing blank-page gaps.
+// ============================================================
+let _savedPaginationState = [];
+
+window.addEventListener('beforeprint', () => {
+  _savedPaginationState = [];
+  document.querySelectorAll('.pagination-spacer, .pagination-break-before').forEach(el => {
+    _savedPaginationState.push({
+      el,
+      marginTop: el.style.marginTop,
+      classes: [...el.classList].filter(c => c === 'pagination-spacer' || c === 'pagination-break-before'),
+      push: el.getAttribute('data-pagination-push')
+    });
+    el.style.marginTop = '';
+    el.classList.remove('pagination-spacer', 'pagination-break-before');
+    el.removeAttribute('data-pagination-push');
+  });
+});
+
+window.addEventListener('afterprint', () => {
+  _savedPaginationState.forEach(({ el, marginTop, classes, push }) => {
+    el.style.marginTop = marginTop;
+    classes.forEach(c => el.classList.add(c));
+    if (push) el.setAttribute('data-pagination-push', push);
+  });
+  _savedPaginationState = [];
+});
 </script>
 </body>
 </html>

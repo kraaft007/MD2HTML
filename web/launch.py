@@ -10,9 +10,9 @@ and renders it immediately.
 """
 import json
 import os
+import subprocess
 import sys
 import tempfile
-import webbrowser
 
 WEBAPP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 
@@ -39,12 +39,12 @@ def launch_file(filepath):
     with os.fdopen(fd, "w") as f:
         f.write(launcher_html)
 
-    webbrowser.open("file://" + launcher_path)
+    subprocess.run(["/usr/bin/open", launcher_path])
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <file.md> [<file2.md> ...]")
+        print(f"Usage: {sys.argv[0]} <file.md> [<file2.md> ...]", file=sys.stderr)
         sys.exit(1)
 
     for path in sys.argv[1:]:

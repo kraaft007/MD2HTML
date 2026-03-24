@@ -187,14 +187,15 @@ body {
   #doc-content li { page-break-inside: avoid; }
   #doc-content h1, #doc-content h2, #doc-content h3 { page-break-after: avoid; }
   /*
-   * Strip ALL pagination engine adjustments in print.
-   * The margin-top spacers are for screen preview only — in print the
-   * browser's native page-break-inside/after CSS rules handle layout.
-   * Mixing JS spacers with the print engine causes double gaps and
-   * massive blank areas.
+   * Pagination engine: margin-top spacers are for screen only.
+   * Zero them in print to avoid double gaps.
+   * BUT keep page-break-before on elements the engine flagged —
+   * these are headings/blocks that need to start a new page
+   * (e.g. companion headings that travel with their code blocks).
    */
   #doc-content .pagination-spacer,
   #doc-content .pagination-break-before { margin-top: 0 !important; }
+  #doc-content .pagination-break-before { page-break-before: always; }
   .page-break-line { display: none !important; }
   .pagination-spacer::before { display: none !important; }
 }

@@ -406,6 +406,7 @@ body {
       <p class="hint">You can also paste markdown text with Cmd+V</p>
       <p class="hint" style="margin-top:8px;">To see hidden files (.claude/) in the file picker:<br><kbd style="background:#eee;padding:1px 4px;border-radius:3px;border:1px solid #ccc;">Cmd+Shift+.</kbd></p>
     </div>
+    <div id="docSourcePath" style="display:none;font-size:9px;color:#888;font-family:'SF Mono','Menlo','Consolas',monospace;margin:0 0 10px 0;padding:0;"></div>
     <div id="doc-content" style="display:none;"></div>
   </div>
 </div>
@@ -652,16 +653,20 @@ function importThemes(file) {
 // ============================================================
 function updateSourcePath(path) {
   currentSourcePath = path || '';
-  const el = document.getElementById('sourcePathDisplay');
+  const sidebar = document.getElementById('sourcePathDisplay');
+  const docPath = document.getElementById('docSourcePath');
   if (currentSourcePath) {
     // Shorten home dir to ~
     let display = currentSourcePath;
     const home = currentSourcePath.match(/^\/Users\/[^/]+/);
     if (home) display = display.replace(home[0], '~');
-    el.textContent = display;
-    el.style.display = 'block';
+    sidebar.textContent = display;
+    sidebar.style.display = 'block';
+    docPath.textContent = 'Source: ' + display;
+    docPath.style.display = 'block';
   } else {
-    el.style.display = 'none';
+    sidebar.style.display = 'none';
+    docPath.style.display = 'none';
   }
 }
 

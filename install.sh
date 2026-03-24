@@ -131,7 +131,16 @@ cat > "$WORKFLOW_PATH/Contents/document.wflow" << 'WFLOW_EOF'
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>/usr/bin/python3 "$HOME/Documents/MD2Print/web/launch.py" "$@"
+					<string>export HOME="$HOME"
+LAUNCH="$HOME/Documents/MD2Print/web/launch.py"
+if [ ! -f "$LAUNCH" ]; then
+    osascript -e "display dialog \"MD2Print not found at $LAUNCH\" buttons {\"OK\"}"
+    exit 1
+fi
+/usr/bin/python3 "$LAUNCH" "$@" 2>/tmp/md2print_error.log
+if [ $? -ne 0 ]; then
+    osascript -e "display dialog \"Error: $(cat /tmp/md2print_error.log)\" buttons {\"OK\"}"
+fi
 </string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
